@@ -1,0 +1,109 @@
+name: Build with Garble Obfuscation
+
+on:
+  push:
+    branches: [ main, master ]
+  pull_request:
+    branches: [ main, master ]
+  workflow_dispatch:  # Manual trigger
+
+jobs:
+  build-windows:
+    name: Build Windows EXE with Garble
+    runs-on: windows-latest
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+
+    - name: Set up Go
+      uses: actions/setup-go@v4
+      with:
+        go-version: '1.21'
+        cache: true
+
+    - name: Install Garble
+      run: |
+        go install mvdan.cc/garble@latest
+        echo "$(go env GOPATH)/bin" | Out-File -FilePath $env:GITHUB_PATH -Append
+
+    - name: Download dependencies
+      run: go mod download
+
+    - name: Build with Garble obfuscation
+      run: |
+        $env:GOOS = "windows"
+        $env:GOARCH = "amd64"
+        $env:GARBLE = "auto"
+        
+        garble -literals -tiny build `
+          -ldflags="-H windowsgui -s -w -extldflags=-static" `
+          -tags="temp0rary" `
+          -o "vortex_obfuscated.exe" `
+          main.go
+
+    - name: Upload build artifact
+      uses: actions/upload-artifact@v4
+      with:
+        name: windows-obfuscated-exe
+        path: vortex_obfuscated.exe
+        retention-days: 1
+
+  build-multi-platform:
+    name: Build Multi-Platform
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        platform: [windows, linux]
+        include:
+          - platform: windows
+            goos: windows
+            goarch: amd64
+            extension: .exe
+          - platform: linux
+            goos: linux
+            goarch: amd64
+            extension: 
+
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+
+    - name: Set up Go
+      uses: actions/setup-go@v4
+      with:
+        go-version: '1.21'
+        cache: true
+
+    - name: Install Garble
+      run: go install mvdan.cc/garble@latest
+
+    - name: Download dependencies
+      run: go mod download
+
+    - name: Build for ${{ matrix.platform }}
+      run: |
+        export GOOS=${{ matrix.goos }}
+        export GOARCH=${{ matrix.goarch }}
+        export GARBLE=auto
+        
+        if [ "${{ matrix.platform }}" = "windows" ]; then
+          garble -literals -tiny build \
+            -ldflags="-H windowsgui -s -w -extldflags=-static" \
+            -tags="temp0rary" \
+            -o "vortex_${{ matrix.platform }}_obfuscated${{ matrix.extension }}" \
+            main.go
+        else
+          garble -literals -tiny build \
+            -ldflags="-s -w -extldflags=-static" \
+            -tags="temp0rary" \
+            -o "vortex_${{ matrix.platform }}_obfuscated${{ matrix.extension }}" \
+            main.go
+        fi
+
+    - name: Upload ${{ matrix.platform }} artifact
+      uses: actions/upload-artifact@v4
+      with:
+        name: ${{ matrix.platform }}-obfuscated-binary
+        path: vortex_${{ matrix.platform }}_obfuscated${{ matrix.extension }}
+        retention-days: 1
