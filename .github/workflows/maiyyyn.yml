@@ -1,0 +1,56 @@
+name: Build Vortex Stealer
+
+on:
+  push:
+    branches: [ main, master ]
+  workflow_dispatch:
+
+jobs:
+  build-windows:
+    name: Build Windows EXE
+    runs-on: windows-latest
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+
+    - name: Set up Go 1.25
+      uses: actions/setup-go@v4
+      with:
+        go-version: '1.25'  # Vortex requires 1.25+
+        check-latest: true
+
+    - name: Verify Go version
+      run: |
+        go version
+        echo "GOPATH: $(go env GOPATH)"
+        echo "GOROOT: $(go env GOROOT)"
+
+    - name: Download dependencies
+      run: |
+        go mod download
+        go mod verify
+
+    - name: Build Vortex
+      run: |
+        $env:GOOS = "windows"
+        $env:GOARCH = "amd64"
+        go build -ldflags="-H windowsgui -s -w" -o vortex.exe
+
+    - name: Verify build
+      run: |
+        if (Test-Path "vortex.exe") {
+          echo "✅ Build successful!"
+          $file = Get-Item "vortex.exe"
+          echo "File size: $([math]::Round($file.Length/1MB, 2)) MB"
+        } else {
+          echo "❌ Build failed - no executable created"
+          exit 1
+        }
+
+    - name: Upload artifact
+      uses: actions/upload-artifact@v4
+      with:
+        name: vortex-stealer
+        path: vortex.exe
+        retention-days: 1
