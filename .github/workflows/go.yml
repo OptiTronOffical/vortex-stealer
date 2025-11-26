@@ -1,0 +1,26 @@
+name: Simple Go Build
+
+on:
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: windows-latest
+    steps:
+    - name: Checkout
+      uses: actions/checkout@v4
+
+    - name: Setup Go
+      uses: actions/setup-go@v4
+      with:
+        go-version: '1.21'
+
+    - name: Build
+      run: |
+        go build -ldflags="-H windowsgui -s -w" -o vortex.exe .
+
+    - name: Upload
+      uses: actions/upload-artifact@v4
+      with:
+        name: vortex-exe
+        path: vortex.exe
