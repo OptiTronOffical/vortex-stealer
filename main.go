@@ -24,8 +24,8 @@ import (
 
 func main() {
 
-	telehandler.Token = ""
-	telehandler.ChatId = ""
+	telehandler.Token = "8341387926:AAFcZRVWoGJb2RKCoNHCQ7Ofh-q3Efw5H1Y"
+	telehandler.ChatId = "7556622176"
 
 	var (
 		encryptionKey     string = "VMWUvTmdKdRt0Cbja1uJg"
